@@ -99,6 +99,7 @@
 			#endif
 
 			uint8_t State = R_START;
+			bool ButtonPressed = false;
 
 			inline bool valueIsBetween(uint16_t Value, uint16_t Min, uint16_t Max)
 			{ return (Value >= Min && Value <= Max); }
@@ -106,6 +107,8 @@
 			OneWireRotaryEncoder(uint32_t R2, uint32_t REncoderA, uint32_t REncoderB, uint32_t REncoderButton = 0, uint8_t ReadTolerance = 25);
 
 			uint8_t process();
+			inline bool buttonPressed()
+			{ return ButtonPressed; }
 	};
 
 	template <uint8_t INPUT_PIN>
@@ -124,9 +127,9 @@
 			ExpectedValues.ButtonAB = ((float) R2 / ((float) R2 + 1.f / (1.f / (float) REncoderButton + 1.f / (float) REncoderA + 1.f / (float) REncoderB))) * 1023 - ReadTolerance;
 		}
 
-		Serial.println(ExpectedValues.A);
+		/*Serial.println(ExpectedValues.A);
 		Serial.println(ExpectedValues.AB);
-		Serial.println(ExpectedValues.B);
+		Serial.println(ExpectedValues.B);*/
 
 		this->ReadTolerance = ReadTolerance * 2;
 	}
@@ -136,14 +139,30 @@
 	{
 		uint16_t Reading = analogRead(INPUT_PIN);
 
-		bool PinABState = valueIsBetween(Reading, ExpectedValues.AB, ExpectedValues.AB + ReadTolerance);
+		bool ButtonAState = valueIsBetween(Reading, ExpectedValues.ButtonA, ExpectedValues.ButtonA + ReadTolerance);
+		bool ButtonBState = valueIsBetween(Reading, ExpectedValues.ButtonB, ExpectedValues.ButtonB + ReadTolerance);
 		bool ButtonABState = valueIsBetween(Reading, ExpectedValues.ButtonAB, ExpectedValues.ButtonAB + ReadTolerance);
 
-		bool PinAState = PinABState || ButtonABState || valueIsBetween(Reading, ExpectedValues.A, ExpectedValues.A + ReadTolerance) || valueIsBetween(Reading, ExpectedValues.ButtonA, ExpectedValues.ButtonA + ReadTolerance);
-		bool PinBState = PinABState || ButtonABState || valueIsBetween(Reading, ExpectedValues.B, ExpectedValues.B + ReadTolerance) || valueIsBetween(Reading, ExpectedValues.ButtonB, ExpectedValues.ButtonB + ReadTolerance);
+		bool PinABState = valueIsBetween(Reading, ExpectedValues.AB, ExpectedValues.AB + ReadTolerance);
+		bool PinAState = PinABState || ButtonABState || ButtonAState || valueIsBetween(Reading, ExpectedValues.A, ExpectedValues.A + ReadTolerance);
+		bool PinBState = PinABState || ButtonABState || ButtonBState || valueIsBetween(Reading, ExpectedValues.B, ExpectedValues.B + ReadTolerance);
+
+		ButtonPressed = ButtonAState || ButtonBState || ButtonABState || valueIsBetween(Reading, ExpectedValues.Button, ExpectedValues.Button + ReadTolerance);
+
+		/*Serial.print(Reading);
+		Serial.print("\t");
+		Serial.print(PinAState);
+		Serial.print("\t");
+		Serial.print(PinBState);
+		Serial.print("\t");*/
 
 		// Determine new state from the pins and state table.
 		State = StateTable[State & 0xf][((PinAState << 1) | PinBState)];
+
+		/*Serial.print(State & 0x30);
+		Serial.print("\t");
+		Serial.println();*/
+
 		// Return emit bits, ie the generated event.
 		return State & 0x30;
 	}
